@@ -540,8 +540,9 @@
                 <div class="section-title" style="margin: 0;">Add New Prompt</div>
                 <button onclick="closeMobileForm()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
             </div>
-            <!-- Mobile form will be injected here -->
-            <div id="mobileFormContent"></div>
+            <div id="mobileFormContent">
+                <!-- Mobile form will be dynamically inserted here with unique IDs -->
+            </div>
         </div>
     </div>
 
@@ -574,7 +575,6 @@
             }
             
             setupTagInput();
-            setupMobileForm();
         }
         
         // Setup service worker for PWA
@@ -687,7 +687,7 @@
             }
         }
         
-        // Save prompt
+        // Save prompt (desktop version)
         async function savePrompt() {
             if (!userId) {
                 alert('Please set your User ID first');
@@ -703,6 +703,31 @@
                 return;
             }
             
+            await savePromptToSupabase(title, content, category);
+        }
+        
+        // Save prompt (mobile version with unique IDs)
+        async function saveMobilePrompt() {
+            if (!userId) {
+                alert('Please set your User ID first');
+                return;
+            }
+            
+            const title = document.getElementById('mobile-title').value.trim();
+            const content = document.getElementById('mobile-content').value.trim();
+            const category = document.getElementById('mobile-category').value;
+            
+            if (!title || !content) {
+                alert('Please enter both title and content');
+                return;
+            }
+            
+            await savePromptToSupabase(title, content, category);
+            closeMobileForm();
+        }
+        
+        // Shared save logic
+        async function savePromptToSupabase(title, content, category) {
             updateSyncStatus('syncing');
             document.getElementById('saveBtnText').textContent = 'Saving...';
             
@@ -742,6 +767,7 @@
                 
                 renderPrompts();
                 clearForm();
+                clearMobileForm();
                 updateSyncStatus('synced', 'Saved!');
                 
                 // Save backup locally
@@ -770,6 +796,7 @@
                 localStorage.setItem('prompts_backup', JSON.stringify(prompts));
                 renderPrompts();
                 clearForm();
+                clearMobileForm();
                 alert('Saved locally. Will sync when connection is restored.');
             }
             
@@ -802,7 +829,7 @@
             }
         }
         
-        // Setup tag input
+        // Setup tag input for desktop
         function setupTagInput() {
             const tagInput = document.getElementById('tagInput');
             tagInput.addEventListener('keydown', (e) => {
@@ -812,6 +839,21 @@
                     tagInput.value = '';
                 }
             });
+        }
+        
+        // Setup tag input for mobile
+        function setupMobileTagInput() {
+            const tagInput = document.getElementById('mobile-tagInput');
+            if (tagInput) {
+                tagInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && tagInput.value.trim()) {
+                        e.preventDefault();
+                        addTag(tagInput.value.trim());
+                        tagInput.value = '';
+                        renderMobileTags();
+                    }
+                });
+            }
         }
         
         // Add tag
@@ -828,7 +870,7 @@
             renderTags();
         }
         
-        // Render tags
+        // Render tags for desktop
         function renderTags() {
             const container = document.getElementById('tagsContainer');
             const tagsHtml = currentTags.map(tag => `
@@ -843,7 +885,24 @@
             setupTagInput();
         }
         
-        // Clear form
+        // Render tags for mobile
+        function renderMobileTags() {
+            const container = document.getElementById('mobile-tagsContainer');
+            if (!container) return;
+            
+            const tagsHtml = currentTags.map(tag => `
+                <span class="tag">
+                    ${tag}
+                    <span class="tag-remove" onclick="removeTag('${tag}'); renderMobileTags();">×</span>
+                </span>
+            `).join('');
+            
+            container.innerHTML = tagsHtml + 
+                '<input type="text" class="tag-input-field" id="mobile-tagInput" placeholder="Press Enter to add">';
+            setupMobileTagInput();
+        }
+        
+        // Clear form (desktop)
         function clearForm() {
             document.getElementById('title').value = '';
             document.getElementById('content').value = '';
@@ -852,6 +911,74 @@
             renderTags();
             editingId = null;
             document.getElementById('saveBtnText').textContent = 'Save Prompt';
+        }
+        
+        // Clear form (mobile)
+        function clearMobileForm() {
+            const title = document.getElementById('mobile-title');
+            const content = document.getElementById('mobile-content');
+            const category = document.getElementById('mobile-category');
+            
+            if (title) title.value = '';
+            if (content) content.value = '';
+            if (category) category.value = 'general';
+            
+            currentTags = [];
+            renderMobileTags();
+        }
+        
+        // Toggle mobile form
+        function toggleMobileForm() {
+            const modal = document.getElementById('mobileFormModal');
+            const mobileFormContent = document.getElementById('mobileFormContent');
+            
+            // Create mobile form with unique IDs
+            mobileFormContent.innerHTML = `
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="mobile-category">
+                        <option value="general">General</option>
+                        <option value="coding">Coding</option>
+                        <option value="writing">Writing</option>
+                        <option value="analysis">Analysis</option>
+                        <option value="creative">Creative</option>
+                        <option value="business">Business</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="mobile-title" placeholder="Give your prompt a name...">
+                </div>
+                
+                <div class="form-group">
+                    <label>Prompt Content</label>
+                    <textarea id="mobile-content" placeholder="Enter your prompt here..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tags</label>
+                    <div class="tags-input" id="mobile-tagsContainer">
+                        <input type="text" class="tag-input-field" id="mobile-tagInput" placeholder="Press Enter to add">
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="saveMobilePrompt()" style="width: 100%">
+                    Save Prompt
+                </button>
+                <button class="btn btn-secondary" onclick="clearMobileForm()" style="width: 100%; margin-top: 10px">Clear</button>
+            `;
+            
+            // Setup mobile tag input
+            setupMobileTagInput();
+            renderMobileTags();
+            
+            modal.classList.add('active');
+        }
+        
+        // Close mobile form
+        function closeMobileForm() {
+            document.getElementById('mobileFormModal').classList.remove('active');
         }
         
         // Render prompts list
@@ -933,20 +1060,26 @@
         function editPrompt(id) {
             const prompt = prompts.find(p => p.id === id);
             if (prompt) {
-                document.getElementById('title').value = prompt.title;
-                document.getElementById('content').value = prompt.content;
-                document.getElementById('category').value = prompt.category || 'general';
-                currentTags = prompt.tags || [];
-                renderTags();
-                editingId = id;
-                document.getElementById('saveBtnText').textContent = 'Update Prompt';
-                
-                // Scroll to form on mobile
+                // Check if on mobile
                 if (window.innerWidth <= 768) {
+                    // Open mobile form and populate with data
                     toggleMobileForm();
+                    document.getElementById('mobile-title').value = prompt.title;
+                    document.getElementById('mobile-content').value = prompt.content;
+                    document.getElementById('mobile-category').value = prompt.category || 'general';
                 } else {
+                    // Desktop editing
+                    document.getElementById('title').value = prompt.title;
+                    document.getElementById('content').value = prompt.content;
+                    document.getElementById('category').value = prompt.category || 'general';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
+                
+                currentTags = prompt.tags || [];
+                renderTags();
+                renderMobileTags();
+                editingId = id;
+                document.getElementById('saveBtnText').textContent = 'Update Prompt';
             }
         }
         
@@ -968,20 +1101,6 @@
             if (message && status === 'synced') {
                 setTimeout(() => updateSyncStatus('synced'), 2000);
             }
-        }
-        
-        // Mobile form handling
-        function setupMobileForm() {
-            const sidebarHtml = document.getElementById('sidebar').innerHTML;
-            document.getElementById('mobileFormContent').innerHTML = sidebarHtml;
-        }
-        
-        function toggleMobileForm() {
-            document.getElementById('mobileFormModal').classList.add('active');
-        }
-        
-        function closeMobileForm() {
-            document.getElementById('mobileFormModal').classList.remove('active');
         }
         
         // Initialize on load
