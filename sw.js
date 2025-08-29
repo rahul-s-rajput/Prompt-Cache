@@ -1,24 +1,26 @@
+// Service Worker for PWA
 const CACHE_NAME = 'prompt-storage-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
+// Install event - cache resources
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+      .then(cache => {
+        console.log('Cache opened');
+        return cache.addAll(urlsToCache);
+      })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
-});
-
+// Activate event - clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -30,5 +32,50 @@ self.addEventListener('activate', event => {
         })
       );
     })
+  );
+  self.clients.claim();
+});
+
+// Fetch event - serve from cache, fallback to network
+self.addEventListener('fetch', event => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+  
+  // Skip Supabase API calls - always fetch from network
+  if (event.request.url.includes('supabase.co')) {
+    return;
+  }
+  
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // Return cached version or fetch from network
+        return response || fetch(event.request).then(fetchResponse => {
+          // Don't cache non-successful responses
+          if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
+            return fetchResponse;
+          }
+          
+          // Clone the response
+          const responseToCache = fetchResponse.clone();
+          
+          caches.open(CACHE_NAME)
+            .then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          
+          return fetchResponse;
+        });
+      })
+      .catch(() => {
+        // Offline fallback
+        return new Response('Offline - Please check your connection', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({
+            'Content-Type': 'text/plain'
+          })
+        });
+      })
   );
 });
