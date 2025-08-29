@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <title>Prompt Storage</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea { min-height: 120px; resize: vertical; }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tag button {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            margin-left: 10px;
+        }
+
+        .prompt-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .prompt-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .prompt-content {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+
+        .prompt-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: none;
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .action-btn.delete {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .action-btn.delete:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .sync-info {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #2e7d32;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 15px; }
+            .tabs { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Prompt Storage Manager</h1>
+        
+        <div class="sync-info">
+            💡 Save this page as a bookmark or add to home screen on mobile for quick access!
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('add')">Add Prompt</button>
+            <button class="tab" onclick="switchTab('view')">View All</button>
+            <button class="tab" onclick="switchTab('import')">Import/Export</button>
+        </div>
+
+        <div id="add-tab" class="tab-content active">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="title" placeholder="Enter prompt title...">
+            </div>
+            
+            <div class="form-group">
+                <label>Prompt Content</label>
+                <textarea id="content" placeholder="Enter your prompt..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Tags (comma separated)</label>
+                <input type="text" id="tags" placeholder="e.g., coding, javascript, react">
+                <div id="tags-display" class="tags-container"></div>
+            </div>
+            
+            <button class="btn" onclick="savePrompt()">Save Prompt</button>
+            <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+        </div>
+
+        <div id="view-tab" class="tab-content">
+            <div class="search-box">
+                <input type="text" id="search" placeholder="Search prompts..." onkeyup="searchPrompts()">
+            </div>
+            <div id="prompts-list"></div>
+        </div>
+
+        <div id="import-tab" class="tab-content">
+            <div class="form-group">
+                <label>Export Data</label>
+                <button class="btn" onclick="exportData()">Download All Prompts (JSON)</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Import Data</label>
+                <input type="file" id="import-file" accept=".json">
+                <button class="btn btn-secondary" onclick="importData()">Import Prompts</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Sync with Google Drive (Optional)</label>
+                <p style="color: #666; font-size: 14px; margin-top: 5px;">
+                    For automatic sync across devices, you can save the exported JSON file to Google Drive 
+                    and import it on other devices.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize storage
+        let prompts = JSON.parse(localStorage.getItem('prompts') || '[]');
+        let editingId = null;
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            if (tab === 'view') {
+                renderPrompts();
+            }
+        }
+
+        // Save prompt
+        function savePrompt() {
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
+            const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(t => t);
+            
+            if (!title || !content) {
+                alert('Please enter both title and content');
+                return;
+            }
+            
+            const prompt = {
+                id: editingId || Date.now().toString(),
+                title,
+                content,
+                tags,
+                createdAt: new Date().toISOString()
+            };
+            
+            if (editingId) {
+                prompts = prompts.map(p => p.id === editingId ? prompt : p);
+                editingId = null;
+            } else {
+                prompts.push(prompt);
+            }
+            
+            localStorage.setItem('prompts', JSON.stringify(prompts));
+            clearForm();
+            alert('Prompt saved successfully!');
+        }
+
+        // Clear form
+        function clearForm() {
+            document.getElementById('title').value = '';
+            document.getElementById('content').value = '';
+            document.getElementById('tags').value = '';
+            editingId = null;
+        }
+
+        // Render prompts
+        function renderPrompts(searchTerm = '') {
+            const list = document.getElementById('prompts-list');
+            const filtered = prompts.filter(p => 
+                !searchTerm || 
+                p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+            
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="empty-state">No prompts found</div>';
+                return;
+            }
+            
+            list.innerHTML = filtered.map(p => `
+                <div class="prompt-card">
+                    <div class="prompt-title">${p.title}</div>
+                    <div class="prompt-content">${p.content.substring(0, 150)}${p.content.length > 150 ? '...' : ''}</div>
+                    <div class="tags-container">
+                        ${p.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+                    </div>
+                    <div class="prompt-actions">
+                        <button class="action-btn" onclick="copyPrompt('${p.id}')">Copy</button>
+                        <button class="action-btn" onclick="editPrompt('${p.id}')">Edit</button>
+                        <button class="action-btn delete" onclick="deletePrompt('${p.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Search prompts
+        function searchPrompts() {
+            const searchTerm = document.getElementById('search').value;
+            renderPrompts(searchTerm);
+        }
+
+        // Copy prompt
+        function copyPrompt(id) {
+            const prompt = prompts.find(p => p.id === id);
+            if (prompt) {
+                navigator.clipboard.writeText(prompt.content);
+                alert('Copied to clipboard!');
+            }
+        }
+
+        // Edit prompt
+        function editPrompt(id) {
+            const prompt = prompts.find(p => p.id === id);
+            if (prompt) {
+                document.getElementById('title').value = prompt.title;
+                document.getElementById('content').value = prompt.content;
+                document.getElementById('tags').value = prompt.tags.join(', ');
+                editingId = id;
+                switchTab('add');
+                document.querySelector('.tab').click();
+            }
+        }
+
+        // Delete prompt
+        function deletePrompt(id) {
+            if (confirm('Delete this prompt?')) {
+                prompts = prompts.filter(p => p.id !== id);
+                localStorage.setItem('prompts', JSON.stringify(prompts));
+                renderPrompts();
+            }
+        }
+
+        // Export data
+        function exportData() {
+            const dataStr = JSON.stringify(prompts, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `prompts-${new Date().toISOString().split('T')[0]}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        // Import data
+        function importData() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        prompts = [...prompts, ...imported];
+                        localStorage.setItem('prompts', JSON.stringify(prompts));
+                        alert('Import successful!');
+                        fileInput.value = '';
+                    } else {
+                        alert('Invalid file format');
+                    }
+                } catch (err) {
+                    alert('Error importing file');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // PWA installation
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch",e=>{});');
+        }
+    </script>
+</body>
+</html>
