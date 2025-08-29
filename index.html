@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-title" content="Prompts">
     <title>Prompt Storage - Cloud Sync</title>
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- PWA Manifest with correct paths -->
+    <link rel="manifest" href="/Prompt-Cache/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/Prompt-Cache/icon-192.png">
+    <link rel="apple-touch-icon" href="/Prompt-Cache/icon-192.png">
     
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -580,7 +580,7 @@
         // Setup service worker for PWA
         function setupServiceWorker() {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js').catch(err => 
+                navigator.serviceWorker.register('/Prompt-Cache/sw.js').catch(err => 
                     console.log('SW registration failed:', err)
                 );
             }
