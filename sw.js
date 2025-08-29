@@ -1,11 +1,11 @@
-// Service Worker for PWA
-const CACHE_NAME = 'prompt-storage-v1';
+// Service Worker for PWA with correct paths
+const CACHE_NAME = 'prompt-cache-v1';
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './icon-192.png',
-  './icon-512.png'
+  '/Prompt-Cache/',
+  '/Prompt-Cache/index.html',
+  '/Prompt-Cache/manifest.webmanifest',
+  '/Prompt-Cache/icon-192.png',
+  '/Prompt-Cache/icon-512.png'
 ];
 
 // Install event - cache resources
