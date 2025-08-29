@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Store and manage your AI prompts with cloud sync">
+    <title>Prompt Storage - Cloud Sync</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icon.png">
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sync-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: #E8F5E9;
+            border-radius: 20px;
+            color: #2E7D32;
+            font-size: 14px;
+        }
+
+        .sync-indicator.syncing {
+            background: #FFF3E0;
+            color: #F57C00;
+        }
+
+        .sync-indicator.error {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .user-setup {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .user-setup h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .user-id-section {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .user-id-section .form-group {
+            flex: 1;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            min-height: calc(100vh - 200px);
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            height: fit-content;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 90px;
+        }
+
+        .content-area {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .tags-input {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            min-height: 38px;
+            cursor: text;
+        }
+
+        .tags-input:focus-within {
+            border-color: #667eea;
+        }
+
+        .tag {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tag-remove {
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            opacity: 0.8;
+        }
+
+        .tag-remove:hover {
+            opacity: 1;
+        }
+
+        .tag-input-field {
+            border: none;
+            outline: none;
+            flex: 1;
+            min-width: 100px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .search-bar {
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .prompt-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 3px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .prompt-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .prompt-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .prompt-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .prompt-date {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .prompt-category {
+            background: #E3F2FD;
+            color: #1976D2;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .prompt-content {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .prompt-content.expanded {
+            max-height: none;
+        }
+
+        .prompt-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .prompt-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 5px 12px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .action-btn.delete {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .action-btn.delete:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .floating-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                display: none;
+            }
+            
+            .floating-btn {
+                display: flex;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                📝 Prompt Storage
+            </div>
+            <div class="sync-indicator" id="syncStatus">
+                <span>●</span>
+                <span>Checking connection...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="user-setup" id="userSetup">
+            <h2>👤 Sync Setup</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                Enter the same User ID on all your devices to sync your prompts
+            </p>
+            <div class="user-id-section">
+                <div class="form-group">
+                    <label>Your User ID</label>
+                    <input type="text" id="userIdInput" placeholder="e.g., user_abc123 or your email">
+                </div>
+                <button class="btn btn-primary" onclick="setUserId()">Start Syncing</button>
+                <button class="btn btn-secondary" onclick="generateUserId()">Generate ID</button>
+            </div>
+            <small style="color: #999; display: block; margin-top: 10px;">
+                Current ID: <strong id="currentUserId">Not set</strong>
+            </small>
+        </div>
+
+        <div class="main-grid">
+            <div class="sidebar" id="sidebar">
+                <div class="section-title">Add New Prompt</div>
+                
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="category">
+                        <option value="general">General</option>
+                        <option value="coding">Coding</option>
+                        <option value="writing">Writing</option>
+                        <option value="analysis">Analysis</option>
+                        <option value="creative">Creative</option>
+                        <option value="business">Business</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="title" placeholder="Give your prompt a name...">
+                </div>
+                
+                <div class="form-group">
+                    <label>Prompt Content</label>
+                    <textarea id="content" placeholder="Enter your prompt here..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tags</label>
+                    <div class="tags-input" id="tagsContainer">
+                        <input type="text" class="tag-input-field" id="tagInput" placeholder="Press Enter to add">
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="savePrompt()" style="width: 100%">
+                    <span id="saveBtnText">Save Prompt</span>
+                </button>
+                <button class="btn btn-secondary" onclick="clearForm()" style="width: 100%; margin-top: 10px">Clear</button>
+            </div>
+
+            <div class="content-area">
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search prompts by title, content, or tags..." onkeyup="searchPrompts()">
+                </div>
+                
+                <div class="section-title">Your Prompts</div>
+                <div id="promptsList">
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p>No prompts yet. Add your first prompt!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="floating-btn" onclick="toggleMobileForm()">+</button>
+
+    <div class="modal" id="mobileFormModal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="section-title" style="margin: 0;">Add New Prompt</div>
+                <button onclick="closeMobileForm()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <!-- Mobile form will be injected here -->
+            <div id="mobileFormContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // IMPORTANT: Replace these with your actual Supabase credentials
+        const SUPABASE_URL = 'https://nxplpizhssbzwdlgofct.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cGxwaXpoc3NiendkbGdvZmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0NTIxMDYsImV4cCI6MjA3MjAyODEwNn0.TD8tmHzFPsDvHQFIXhCRL62JKiB2jXJR8Khgbal1jxA';
+        
+        // Initialize Supabase
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // State management
+        let prompts = [];
+        let currentTags = [];
+        let editingId = null;
+        let userId = localStorage.getItem('promptUserId') || '';
+        let realtimeChannel = null;
+        
+        // Initialize
+        async function init() {
+            setupServiceWorker();
+            
+            if (userId) {
+                document.getElementById('currentUserId').textContent = userId;
+                document.getElementById('userIdInput').value = userId;
+                await connectToSupabase();
+            } else {
+                updateSyncStatus('error', 'Set User ID to sync');
+            }
+            
+            setupTagInput();
+            setupMobileForm();
+        }
+        
+        // Setup service worker for PWA
+        function setupServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(err => 
+                    console.log('SW registration failed:', err)
+                );
+            }
+        }
+        
+        // Generate random user ID
+        function generateUserId() {
+            const newId = 'user_' + Math.random().toString(36).substr(2, 9);
+            document.getElementById('userIdInput').value = newId;
+        }
+        
+        // Set user ID and connect
+        async function setUserId() {
+            const input = document.getElementById('userIdInput').value.trim();
+            if (!input) {
+                alert('Please enter a User ID');
+                return;
+            }
+            
+            userId = input;
+            localStorage.setItem('promptUserId', userId);
+            document.getElementById('currentUserId').textContent = userId;
+            await connectToSupabase();
+        }
+        
+        // Connect to Supabase and setup realtime
+        async function connectToSupabase() {
+            if (!userId) return;
+            
+            // Load initial data
+            await loadPrompts();
+            
+            // Setup realtime subscription
+            if (realtimeChannel) {
+                supabaseClient.removeChannel(realtimeChannel);
+            }
+            
+            realtimeChannel = supabaseClient
+                .channel(`prompts-${userId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'prompts',
+                        filter: `user_id=eq.${userId}`
+                    },
+                    (payload) => {
+                        console.log('Realtime change:', payload);
+                        handleRealtimeChange(payload);
+                    }
+                )
+                .subscribe();
+        }
+        
+        // Handle realtime changes
+        function handleRealtimeChange(payload) {
+            if (payload.eventType === 'INSERT') {
+                prompts.unshift(payload.new);
+                renderPrompts();
+            } else if (payload.eventType === 'UPDATE') {
+                prompts = prompts.map(p => 
+                    p.id === payload.new.id ? payload.new : p
+                );
+                renderPrompts();
+            } else if (payload.eventType === 'DELETE') {
+                prompts = prompts.filter(p => p.id !== payload.old.id);
+                renderPrompts();
+            }
+            updateSyncStatus('synced', 'Updated');
+        }
+        
+        // Load prompts from Supabase
+        async function loadPrompts() {
+            if (!userId) {
+                updateSyncStatus('error', 'Set User ID to sync');
+                return;
+            }
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('prompts')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                prompts = data || [];
+                renderPrompts();
+                updateSyncStatus('synced');
+            } catch (error) {
+                console.error('Error loading prompts:', error);
+                updateSyncStatus('error', 'Connection failed');
+                
+                // Load from local storage as fallback
+                const localData = localStorage.getItem('prompts_backup');
+                if (localData) {
+                    prompts = JSON.parse(localData);
+                    renderPrompts();
+                }
+            }
+        }
+        
+        // Save prompt
+        async function savePrompt() {
+            if (!userId) {
+                alert('Please set your User ID first');
+                return;
+            }
+            
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
+            const category = document.getElementById('category').value;
+            
+            if (!title || !content) {
+                alert('Please enter both title and content');
+                return;
+            }
+            
+            updateSyncStatus('syncing');
+            document.getElementById('saveBtnText').textContent = 'Saving...';
+            
+            try {
+                const promptData = {
+                    user_id: userId,
+                    title,
+                    content,
+                    category,
+                    tags: currentTags
+                };
+                
+                let result;
+                if (editingId) {
+                    result = await supabaseClient
+                        .from('prompts')
+                        .update(promptData)
+                        .eq('id', editingId)
+                        .select();
+                } else {
+                    result = await supabaseClient
+                        .from('prompts')
+                        .insert([promptData])
+                        .select();
+                }
+                
+                if (result.error) throw result.error;
+                
+                // Update local state immediately
+                if (editingId) {
+                    prompts = prompts.map(p => 
+                        p.id === editingId ? result.data[0] : p
+                    );
+                } else {
+                    prompts.unshift(result.data[0]);
+                }
+                
+                renderPrompts();
+                clearForm();
+                updateSyncStatus('synced', 'Saved!');
+                
+                // Save backup locally
+                localStorage.setItem('prompts_backup', JSON.stringify(prompts));
+            } catch (error) {
+                console.error('Error saving prompt:', error);
+                updateSyncStatus('error', 'Save failed');
+                
+                // Save locally as fallback
+                const localPrompt = {
+                    id: editingId || 'local_' + Date.now(),
+                    user_id: userId,
+                    title,
+                    content,
+                    category,
+                    tags: currentTags,
+                    created_at: new Date().toISOString()
+                };
+                
+                if (editingId) {
+                    prompts = prompts.map(p => p.id === editingId ? localPrompt : p);
+                } else {
+                    prompts.unshift(localPrompt);
+                }
+                
+                localStorage.setItem('prompts_backup', JSON.stringify(prompts));
+                renderPrompts();
+                clearForm();
+                alert('Saved locally. Will sync when connection is restored.');
+            }
+            
+            document.getElementById('saveBtnText').textContent = 'Save Prompt';
+        }
+        
+        // Delete prompt
+        async function deletePrompt(id) {
+            if (!confirm('Delete this prompt?')) return;
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                const { error } = await supabaseClient
+                    .from('prompts')
+                    .delete()
+                    .eq('id', id);
+                
+                if (error) throw error;
+                
+                prompts = prompts.filter(p => p.id !== id);
+                renderPrompts();
+                updateSyncStatus('synced', 'Deleted');
+                
+                // Update local backup
+                localStorage.setItem('prompts_backup', JSON.stringify(prompts));
+            } catch (error) {
+                console.error('Error deleting prompt:', error);
+                updateSyncStatus('error', 'Delete failed');
+            }
+        }
+        
+        // Setup tag input
+        function setupTagInput() {
+            const tagInput = document.getElementById('tagInput');
+            tagInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && tagInput.value.trim()) {
+                    e.preventDefault();
+                    addTag(tagInput.value.trim());
+                    tagInput.value = '';
+                }
+            });
+        }
+        
+        // Add tag
+        function addTag(tag) {
+            if (!currentTags.includes(tag)) {
+                currentTags.push(tag);
+                renderTags();
+            }
+        }
+        
+        // Remove tag
+        function removeTag(tag) {
+            currentTags = currentTags.filter(t => t !== tag);
+            renderTags();
+        }
+        
+        // Render tags
+        function renderTags() {
+            const container = document.getElementById('tagsContainer');
+            const tagsHtml = currentTags.map(tag => `
+                <span class="tag">
+                    ${tag}
+                    <span class="tag-remove" onclick="removeTag('${tag}')">×</span>
+                </span>
+            `).join('');
+            
+            container.innerHTML = tagsHtml + 
+                '<input type="text" class="tag-input-field" id="tagInput" placeholder="Press Enter to add">';
+            setupTagInput();
+        }
+        
+        // Clear form
+        function clearForm() {
+            document.getElementById('title').value = '';
+            document.getElementById('content').value = '';
+            document.getElementById('category').value = 'general';
+            currentTags = [];
+            renderTags();
+            editingId = null;
+            document.getElementById('saveBtnText').textContent = 'Save Prompt';
+        }
+        
+        // Render prompts list
+        function renderPrompts(searchTerm = '') {
+            const list = document.getElementById('promptsList');
+            
+            let filtered = prompts;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = prompts.filter(p => 
+                    p.title.toLowerCase().includes(term) ||
+                    p.content.toLowerCase().includes(term) ||
+                    (p.tags && p.tags.some(t => t.toLowerCase().includes(term))) ||
+                    p.category.toLowerCase().includes(term)
+                );
+            }
+            
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p>${searchTerm ? 'No matching prompts found' : 'No prompts yet. Add your first prompt!'}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = filtered.map(p => `
+                <div class="prompt-card">
+                    <div class="prompt-header">
+                        <div>
+                            <div class="prompt-title">${p.title}</div>
+                            <div class="prompt-meta">
+                                <span class="prompt-date">${new Date(p.created_at).toLocaleDateString()}</span>
+                                <span class="prompt-category">${p.category}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="prompt-content" id="content-${p.id}">${p.content}</div>
+                    ${p.tags && p.tags.length > 0 ? `
+                        <div class="prompt-tags">
+                            ${p.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="prompt-actions">
+                        <button class="action-btn" onclick="copyPrompt('${p.id}')">Copy</button>
+                        <button class="action-btn" onclick="expandPrompt('${p.id}')">Expand</button>
+                        <button class="action-btn" onclick="editPrompt('${p.id}')">Edit</button>
+                        <button class="action-btn delete" onclick="deletePrompt('${p.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Search prompts
+        function searchPrompts() {
+            const searchTerm = document.getElementById('searchInput').value;
+            renderPrompts(searchTerm);
+        }
+        
+        // Copy prompt to clipboard
+        function copyPrompt(id) {
+            const prompt = prompts.find(p => p.id === id);
+            if (prompt) {
+                navigator.clipboard.writeText(prompt.content);
+                updateSyncStatus('synced', 'Copied!');
+            }
+        }
+        
+        // Expand/collapse prompt content
+        function expandPrompt(id) {
+            const content = document.getElementById(`content-${id}`);
+            content.classList.toggle('expanded');
+        }
+        
+        // Edit prompt
+        function editPrompt(id) {
+            const prompt = prompts.find(p => p.id === id);
+            if (prompt) {
+                document.getElementById('title').value = prompt.title;
+                document.getElementById('content').value = prompt.content;
+                document.getElementById('category').value = prompt.category || 'general';
+                currentTags = prompt.tags || [];
+                renderTags();
+                editingId = id;
+                document.getElementById('saveBtnText').textContent = 'Update Prompt';
+                
+                // Scroll to form on mobile
+                if (window.innerWidth <= 768) {
+                    toggleMobileForm();
+                } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        }
+        
+        // Update sync status indicator
+        function updateSyncStatus(status, message) {
+            const indicator = document.getElementById('syncStatus');
+            const statusMessages = {
+                synced: message || 'Synced',
+                syncing: 'Syncing...',
+                error: message || 'Offline'
+            };
+            
+            indicator.className = `sync-indicator ${status}`;
+            indicator.innerHTML = `
+                <span>${status === 'syncing' ? '<div class="loading-spinner"></div>' : '●'}</span>
+                <span>${statusMessages[status]}</span>
+            `;
+            
+            if (message && status === 'synced') {
+                setTimeout(() => updateSyncStatus('synced'), 2000);
+            }
+        }
+        
+        // Mobile form handling
+        function setupMobileForm() {
+            const sidebarHtml = document.getElementById('sidebar').innerHTML;
+            document.getElementById('mobileFormContent').innerHTML = sidebarHtml;
+        }
+        
+        function toggleMobileForm() {
+            document.getElementById('mobileFormModal').classList.add('active');
+        }
+        
+        function closeMobileForm() {
+            document.getElementById('mobileFormModal').classList.remove('active');
+        }
+        
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
